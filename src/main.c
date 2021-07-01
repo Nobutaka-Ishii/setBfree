@@ -437,6 +437,10 @@ allocAll ()
 		fprintf (stderr, "FATAL: memory allocation failed for midi config.\n");
 		exit (1);
 	}
+	if (!(inst.hold = allocHold (&inst))) {
+		fprintf (stderr, "FATAL: memory allocation failed for midi config.\n");
+		exit (1);
+	}
 }
 
 /*
@@ -493,6 +497,14 @@ initAll ()
 	fprintf (stderr, "Whirl : ");
 	fflush (stderr);
 	initWhirl (inst.whirl, inst.midicfg, SampleRateD);
+
+	fprintf (stderr, "Hold function : ");
+	fflush (stderr);
+	/*
+	 * Hold function needs not only hold instance but also
+	 * synthesizer for NOTE-OFF messaging.
+	 */
+	initHoldFunc (&inst, inst.midicfg);
 
 #ifdef HAVE_ZITACONVOLVE
 	fprintf (stderr, "Convolve : ");

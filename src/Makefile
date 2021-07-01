@@ -20,6 +20,7 @@ OBJS= \
 	main.o \
 	midnam.o \
 	memstream.o \
+    hold.o \
 	../b_reverb/reverb.c \
 	../b_whirl/eqcomp.c \
 	../b_whirl/whirl.c \
@@ -38,6 +39,7 @@ HEADERS = \
 	tonegen.h \
 	defaultpgm.h \
 	memstream.h \
+    hold.h \
 	../b_reverb/reverb.h \
 	../b_whirl/eqcomp.h \
 	../b_whirl/whirl.h \

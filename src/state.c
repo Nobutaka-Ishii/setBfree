@@ -278,4 +278,6 @@ initRunningConfig (void* t, void* mcfg)
 	notifyControlChangeByName (mcfg, "reverb.mix", 127 * .1);
 	notifyControlChangeByName (mcfg, "swellpedal1", 127);
 	notifyControlChangeByName (mcfg, "rotary.speed-select", 4 * 15);
+
+	notifyControlChangeByName (mcfg, "hold", 0);
 }

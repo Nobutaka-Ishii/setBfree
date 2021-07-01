@@ -161,6 +161,11 @@ static const char* ccFuncNames[] = {
 
 	"convolution.mix",
 
+	"hold",
+	"hold.aimsA",
+	"hold.aimsB",
+	"hold.aimsC",
+
 	NULL
 };
 
@@ -975,6 +980,13 @@ midiPrimeControllerMapping (void* mcfg)
 	loadCCMap (m, "overdrive.character", 93, m->ctrlUseA, NULL, NULL);
 
 	loadCCMap (m, "convolution.mix", 94, m->ctrlUseA, NULL, NULL);
+
+	// hold function
+	loadCCMap (m, "hold", 64, m->ctrlUseA, m->ctrlUseB, m->ctrlUseC);
+	loadCCMap (m, "hold.aimsA", 84, m->ctrlUseA, NULL, NULL);
+	loadCCMap (m, "hold.aimsB", 85, NULL, m->ctrlUseB, NULL);
+	loadCCMap (m, "hold.aimsC", 86, NULL, NULL, m->ctrlUseC);
+
 #if 0
   loadCCMap (m, "overdrive.inputgain", 21, m->ctrlUseA, NULL, NULL);
   loadCCMap (m, "overdrive.outputgain",22, m->ctrlUseA, NULL, NULL);
@@ -1185,12 +1197,22 @@ process_midi_event (void* instp, const struct bmidi_event_t* ev)
 {
 	struct b_instance* inst = (struct b_instance*)instp;
 	struct b_midicfg*  m    = (struct b_midicfg*)inst->midicfg;
+	struct b_hold*     h   = (struct b_hold*)inst->hold;
 	switch (ev->type) {
 		case NOTE_ON:
+			h->fingeredNoteTbl[ev->channel][ev->d.tone.note] = TRUE;
+			if( h->holdStat ){
+				if( h->heldNoteTbl[ev->channel][ev->d.tone.note] ){ // if it's the 2nd or further NOTE-ON message while the same note is sounding.
+						// Once, momentary NOTE-OFF, and later NOTE-ON
+						( *(h->mkSndGap) )(instp, ev);
+				}
+				h->heldNoteTbl[ev->channel][ev->d.tone.note] = TRUE;
+			}
 			if (m->keyTable[ev->channel] && m->keyTable[ev->channel][ev->d.tone.note] != 255) {
 				if (ev->d.tone.velocity > 0) {
 					oscKeyOn (inst->synth, m->keyTable[ev->channel][ev->d.tone.note],
 					          map_to_real_key (m, ev->channel, ev->d.tone.note));
+					h->heldNoteTbl[ev->channel][ev->d.tone.note] = 1;
 				} else {
 					oscKeyOff (inst->synth, m->keyTable[ev->channel][ev->d.tone.note],
 					           map_to_real_key (m, ev->channel, ev->d.tone.note));
@@ -1198,9 +1220,13 @@ process_midi_event (void* instp, const struct bmidi_event_t* ev)
 			}
 			break;
 		case NOTE_OFF:
-			if (m->keyTable[ev->channel] && m->keyTable[ev->channel][ev->d.tone.note] != 255)
-				oscKeyOff (inst->synth, m->keyTable[ev->channel][ev->d.tone.note],
-				           map_to_real_key (m, ev->channel, ev->d.tone.note));
+			h->fingeredNoteTbl[ev->channel][ev->d.tone.note] = FALSE;
+			if( !(h->holdStat) ){
+				if (m->keyTable[ev->channel] && m->keyTable[ev->channel][ev->d.tone.note] != 255){
+					oscKeyOff (inst->synth, m->keyTable[ev->channel][ev->d.tone.note],
+					           map_to_real_key (m, ev->channel, ev->d.tone.note));
+				}
+			}
 			break;
 		case PROGRAM_CHANGE:
 			installProgram (inst, ev->d.control.value);
@@ -1236,20 +1262,14 @@ process_midi_event (void* instp, const struct bmidi_event_t* ev)
 			/*  0x00 and 0x20 are used for BANK select */
 			if (ev->d.control.param == 0x00 || ev->d.control.param == 0x20) {
 				break;
-			} else
-
-			    if (ev->d.control.param == 121) {
+			} else if (ev->d.control.param == 121) {
 				/* TODO - reset all controller */
 				break;
-			} else
-
-			    if (ev->d.control.param == 120 || ev->d.control.param == 123) {
+			} else if (ev->d.control.param == 120 || ev->d.control.param == 123) {
 				/* Midi panic: 120: all sound off, 123: all notes off*/
 				midi_panic (instp);
 				break;
-			} else
-
-			    if (ev->d.control.param >= 120) {
+			} else if (ev->d.control.param >= 120) {
 				/* params 122-127 are reserved - skip them. */
 				break;
 			} else {
@@ -1290,9 +1310,7 @@ process_midi_event (void* instp, const struct bmidi_event_t* ev)
 						m->hookfn (-1, "special.midimap", 0, NULL, m->hookarg);
 					}
 					m->ccuimap = -1;
-				} else
-
-				    if (m->ctrlvec[ev->channel] && m->ctrlvec[ev->channel][ev->d.control.param].fn) {
+				} else if (m->ctrlvec[ev->channel] && m->ctrlvec[ev->channel][ev->d.control.param].fn) {
 					uint8_t val = ev->d.control.value & 0x7f;
 					if (m->ctrlflg[ev->channel][ev->d.control.param] & MFLAG_INV) {
 						val = 127 - val;

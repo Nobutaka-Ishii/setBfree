@@ -26,12 +26,14 @@
 #include "tonegen.h"
 #include "vibrato.h"
 #include "whirl.h"
+#include "hold.h"
 
 typedef struct b_instance {
 	struct b_reverb*    reverb;
 	struct b_whirl*     whirl;
 	struct b_tonegen*   synth;
 	struct b_programme* progs;
+	struct b_hold*      hold;
 	void*               midicfg;
 	void*               preamp;
 	void*               state;
